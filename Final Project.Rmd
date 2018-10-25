@@ -1,0 +1,108 @@
+---
+title: "West Nile Prediction"
+output:
+  html_document:
+    df_print: paged
+---
+
+                                        Predicting West Nile Virus Spread
+
+West Nile virus is spread to humans from infected mosquito bites. West Nile virus is present throughout the world, from Africa and Europe, to North and South America. While most cases of the virus do not show symptoms those that do have very severe fever, headaches, nausea and vomiting, often requiring them to miss days of work. In about 10% of cases, that show symptoms, patients will die, in 2012 the United States had one its worst outbreaks leading to over 250 deaths. To prevent these cases countries have developed many control strategies, including spraying insecticides. 
+
+Spraying insecticides kills the adult mosquitoes, our primary concern is the adult female mosquito, who bites humans for blood. There are periods where there will be very few adult mosquitoes present, but the juvenile stages, often in water, will present and unreachable by spraying. Due to this fact we can hope to optimize our spraying by using years of trap collection data, along with locations and weather data, to find the best time for spraying to occur. 
+
+The dataset I have chosen in found on Kaggle, called West Nile Virus Prediction. It has a dataset containing <100,000 mosquito samples, and their status of virus present. Then a data with weather conditions, temperature, sun, rain, sunset time, sunrise, and so on. I hope to use this data set to be able to predict the next outbreak of West Nile. 
+
+```{r}
+library(dplyr)
+library(readr)
+library(ggmap)
+data_dir <- "C:/Users/Dean/Desktop/University of Idaho/Classes/Fall 2018/STAT 517/west_nile/input"
+train <- read_csv(file.path(data_dir, "train.csv"))
+mapdata <- readRDS(file.path(data_dir, "mapdata_copyright_openstreetmap_contributors.rds"))
+train$Date <- as.Date(train$Date)
+
+# Which date has the most measurements?
+counts_by_date <- train %>% group_by(Date) %>% summarise(NumMeasurements = n()) %>% arrange(desc(NumMeasurements)) %>% head
+counts_by_date
+
+date_to_show <- counts_by_date$Date[1]
+
+single_date_grouped_by_location <- train %>% 
+  filter(Date == "2009-06-02") %>%
+  group_by(Longitude, Latitude) %>%
+  summarize(NumMosquitos = sum(NumMosquitos))
+
+p <- ggmap(mapdata) + 
+     geom_point(aes(x=Longitude, y=Latitude, color=NumMosquitos), size=3, data=single_date_grouped_by_location) + 
+     theme_light(base_size=14) + xlab("") + ylab("") +
+     theme(strip.background = element_blank(),
+           strip.text.x     = element_blank(),
+           axis.text.x      = element_blank(),
+           axis.text.y      = element_blank(),
+           axis.ticks       = element_blank(),
+           axis.line        = element_blank(),
+           panel.border     = element_blank(),
+           plot.title       = element_text(vjust=2)) +
+     scale_colour_gradientn("Number of\nMosquitos", colours=c("#5e4fa2", "#3288bd", "#66c2a5", "#abdda4", "#e6f598", "#fee08b", "#fdae61", "#f46d43", "#d53e4f", "#9e0142"),
+                                                   values=rev(1-log10(1:10))) +
+     ggtitle(sprintf("Mosquito Counts on %s", date_to_show))
+
+ggsave("mosquito_counts_map.png", p, width=8, height=6, units="in")
+p
+```
+From this map we see which traps in the city of Chicago are trapping the most mosquitoes. 
+
+```{r}
+  train$Date = as.Date(train$Date)
+  lt = as.POSIXlt(train$Date)
+  woy = floor((lt$yday - lt$wday + 7) / 7)
+
+  hits = lt$wday == 1 & lt$year == 113 & woy == 27
+  train$Date[hits] = train$Date[hits] - 3
+  hits = lt$wday == 1 & lt$year == 111 & woy == 28
+  train$Date[hits] = train$Date[hits] - 3
+  hits = lt$wday == 1 & lt$year == 111 & woy == 30
+  train$Date[hits] = train$Date[hits] - 3
+  hits = lt$wday == 1 & lt$year == 111 & woy == 37
+  train$Date[hits] = train$Date[hits] - 3
+  hits = lt$wday == 4 & lt$year == 111 & woy == 35
+  train$Date[hits] = train$Date[hits] + 1
+  hits = lt$wday == 2 & lt$year == 109 & woy == 22
+  train$Date[hits] = train$Date[hits] - 4
+  hits = lt$wday == 1 & lt$year == 109 & woy == 24
+  train$Date[hits] = train$Date[hits] - 3
+  hits = lt$wday == 1 & lt$year == 109 & woy == 25
+  train$Date[hits] = train$Date[hits] - 3
+  hits = lt$wday == 1 & lt$year == 109 & woy == 26
+  train$Date[hits] = train$Date[hits] - 3
+  hits = lt$wday == 1 & lt$year == 109 & woy == 27
+  train$Date[hits] = train$Date[hits] - 3
+  hits = lt$wday == 1 & lt$year == 109 & woy == 28
+  train$Date[hits] = train$Date[hits] - 3
+  hits = lt$wday == 1 & lt$year == 109 & woy == 30
+  train$Date[hits] = train$Date[hits] - 3
+  hits = lt$wday == 2 & lt$year == 109 & woy == 34
+  train$Date[hits] = train$Date[hits] - 4
+  hits = lt$wday == 1 & lt$year == 109 & woy == 37
+  train$Date[hits] = train$Date[hits] - 3
+  hits = lt$wday == 5 & lt$year == 107 & woy == 25
+  train$Date[hits] = train$Date[hits] + 3
+
+library(plyr)
+  train$Date = as.POSIXlt(train$Date)
+  train$Year = as.factor(train$Date$year+1900)
+  train$Week = floor((train$Date$yday - train$Date$wday + 7) / 7)
+  ftrain = ddply(train,.(Week,Year),summarize,WnvCount=sum(WnvPresent))
+  ftrain = ftrain[order(ftrain$Year,ftrain$Week),]
+
+  ggplot(ftrain,aes(x=Week,y=WnvCount,colour=Year))+ geom_line(size = 1.3) +
+    scale_fill_grey()+theme(panel.background = element_rect(fill = 'white', colour = 'white'))+
+  theme(axis.text.x = element_text(angle=0, colour="black"))+
+  theme(axis.line.x = element_line(color="black",size=1))+
+  theme(axis.line.y = element_line(color="black",size=1))
+```
+
+From this plot we can see that some years have more West nile present than others, and that depending on the time of the year there is more or less present. This most likely has a lot to do with the weather at the time of year, for example, mosuitoes are not likely to be present in the dead of the winter in Chicago. 
+
+I will further explore this data set and the weather data with it to predict what causes outbreaks of West Nile, and if its possible to predict the next outbreak. 
